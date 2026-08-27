@@ -98,7 +98,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Firebase Configuration (from user prompt)
@@ -205,8 +205,16 @@
 
         async function initAuth() {
             try {
-                if (initialToken) await auth.signInWithCustomToken(initialToken);
-                else await signInAnonymously(auth);
+                if (initialToken) {
+                    try {
+                        await signInWithCustomToken(auth, initialToken);
+                    } catch (tokenError) {
+                        console.warn("حدث عدم تطابق في التوكن (بسبب استخدام مشروع Firebase خاص). جاري استخدام تسجيل الدخول المجهول...");
+                        await signInAnonymously(auth);
+                    }
+                } else {
+                    await signInAnonymously(auth);
+                }
                 
                 if (state.myEmail && state.partnerEmail) {
                     await connectCouple(state.myEmail, state.partnerEmail, state.myName);
