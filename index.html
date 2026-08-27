@@ -219,7 +219,8 @@
                 if (state.myEmail && state.partnerEmail) {
                     await connectCouple(state.myEmail, state.partnerEmail, state.myName);
                 } else {
-                    renderLogin();
+                    state.view = 'login';
+                    renderApp();
                 }
             } catch (error) {
                 console.error("Auth error:", error);
