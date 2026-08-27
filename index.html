@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>بوابة الجرأة المطلقة - الملاذ الحي</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Tajawal:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-dark: #0a0000;
+            --bg-card: rgba(20, 3, 3, 0.95);
+            --primary: #d32f2f;
+            --primary-glow: rgba(211, 47, 47, 0.6);
+            --gold: #d4af37;
+            --hot-pink: #c2185b;
+            --font-title: 'Amiri', serif;
+            --font-body: 'Tajawal', sans-serif;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background-color: var(--bg-dark);
+            color: #f5f5f5;
+            background-image: radial-gradient(circle at 50% 0%, #3a0000 0%, var(--bg-dark) 80%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        h1, h2, h3, .title-font { font-family: var(--font-title); }
+
+        .glass-panel {
+            background: var(--bg-card);
+            border: 1px solid rgba(211, 47, 47, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(8px);
+        }
+
+        /* Animations */
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .pulse-glow { animation: pulseGlow 2s infinite; }
+        @keyframes pulseGlow { 
+            0% { text-shadow: 0 0 5px var(--primary-glow); } 
+            50% { text-shadow: 0 0 20px var(--primary); } 
+            100% { text-shadow: 0 0 5px var(--primary-glow); } 
+        }
+
+        /* Custom Inputs & Buttons */
+        .input-field {
+            width: 100%; padding: 12px 15px; margin-bottom: 15px;
+            background: rgba(0, 0, 0, 0.7); border: 1px solid var(--primary);
+            color: var(--gold); border-radius: 8px; text-align: center; outline: none;
+            transition: all 0.3s;
+        }
+        .input-field:focus { box-shadow: 0 0 15px var(--primary-glow); }
+
+        .btn-main {
+            background: linear-gradient(45deg, #8e0000, #d32f2f);
+            color: white; padding: 12px 20px; border-radius: 8px; border: 1px solid var(--primary);
+            width: 100%; font-weight: bold; cursor: pointer; transition: all 0.3s;
+        }
+        .btn-main:hover, .btn-main:active { transform: scale(0.98); box-shadow: 0 0 20px var(--primary-glow); }
+        
+        .btn-hot { background: linear-gradient(45deg, #880e4f, #c2185b); border-color: #ec407a; }
+        
+        /* Toggle Switch */
+        .toggle-checkbox:checked { right: 0; border-color: #4ade80; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #4ade80; }
+        
+        /* Loader */
+        .loader { border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid var(--primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="p-4 sm:p-8 flex flex-col items-center">
+
+    <!-- App Container -->
+    <div id="app" class="w-full max-w-lg w-full relative">
+        <!-- Views will be injected here -->
+        <div id="loading-view" class="flex flex-col items-center justify-center h-64 fade-in">
+            <div class="loader mb-4 w-12 h-12"></div>
+            <p class="text-gray-400">جاري الاتصال بالخوادم الآمنة...</p>
+        </div>
+    </div>
+
+    <!-- Overlay Modals -->
+    <div id="modal-container" class="fixed inset-0 bg-black bg-opacity-80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div id="modal-content" class="glass-panel w-full max-w-sm rounded-xl p-6 text-center transform transition-all scale-95 opacity-0">
+            <!-- Modal logic -->
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Configuration (from user prompt)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDgbNUBxTlMj-otRu0Dfqz9WtCNkyeiR0A",
+            authDomain: "sico-a853b.firebaseapp.com",
+            projectId: "sico-a853b",
+            storageBucket: "sico-a853b.firebasestorage.app",
+            messagingSenderId: "143363011062",
+            appId: "1:143363011062:web:2a570ed80029cc749f57d7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Env variables handling for Sandbox
+        const sandboxAppId = typeof __app_id !== 'undefined' ? __app_id : 'sico-a853b';
+        let initialToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Global State
+        const state = {
+            myEmail: localStorage.getItem('sico_myEmail') || '',
+            partnerEmail: localStorage.getItem('sico_partnerEmail') || '',
+            myName: localStorage.getItem('sico_myName') || '',
+            coupleId: '',
+            docRef: null,
+            unsubscribe: null,
+            serverData: null,
+            view: 'loading' // loading, login, dashboard, game
+        };
+
+        // --- STREAMING_CHUNK: Huge Content Database ---
+        const RAW_DATA = {
+            dirty_talk: [
+                "[SENDER] يقترب من أذن [RECEIVER] ويهمس: 'أنا مش هرحمك الليلة دي.. جسمك ده كله ملكي وهعمل فيه اللي أنا عايزه لحد ما تترجاني أقف.'",
+                "[RECEIVER] تنظر في عيون [SENDER] بجرأة وتقول: 'عايزاك تقطعني الليلة.. مش عايزة حنية، دخل كله وخليني أحس بيك.'",
+                "[SENDER] يصفع مؤخرة [RECEIVER] صفعة خفيفة مثيرة ويقول: 'انتي أحلى واحدة ليا في السرير.. بحب فجورك وانتي تحتيا بتترعشي.'",
+                "على [RECEIVER] أن تركع أمام [SENDER] وتقول: 'طلعهولي.. عايزة أمصه كله وأخليه في بؤي لحد ما تجيبه، عايزة أشوف الخضوع في عينيك.'",
+                "[SENDER] يثبت يدي [RECEIVER] فوق رأسها ويقول: 'هتتعاقبي النهاردة.. هضربك على طيزك لحد ما تحمر، وكل ضربة هتبوسيني وتطلبي مني أكمل.'",
+                "[RECEIVER] تدفع [SENDER] على السرير وتركبه وتقول: 'أنا اللي هسوق الليلة دي.. نام على ظهرك ووريني هتستحمل فجوري إزاي.'",
+                "[SENDER] يفتح ساقي [RECEIVER] ويقول: 'ريحتك بتجننّي.. هلحسلك لحد ما تترعشي وتجيبي ميتك كلها على لساني وتترجاني أدخله.'",
+                "[RECEIVER] تهمس: 'عايزة أحس بيك بتخبط فيا جامد من ورا، اضربني وشتمني بأوسخ الألفاظ وأنت بتعملها.'",
+                "[SENDER] يعض رقبة [RECEIVER] بخفة ويقول: 'أنتي مجرد جارية ليا الليلة دي، مش هتعملي حاجة غير إنك تمتعيني وتسمعي الكلام.'",
+                "[RECEIVER] تمسك عضو [SENDER] بقوة وتهمس: 'بتاعك ده بتاعي أنا بس.. الليلة هعصره لحد ما تنزل كل قطرة فيه جوه بؤي.'",
+                "[SENDER] ينظر لجسد [RECEIVER] العاري ويقول: 'بزك وطيزك دول مخلوقين عشان أتمتع بيهم.. هفشخك بوس ورضاعة لحد ما تعيطي من المتعة.'",
+                "[RECEIVER] ترجع رأسها للخلف وتتأوه: 'أيوة نيكني كمان.. أضرب جامد، متوقفش خالص لحد ما أقولك.'",
+                "[SENDER] يهمس: 'صوت أهاتك ده بيجنني، كل ما تصرخي هنيكك أسرع وأعنف.'"
+            ],
+            forbidden: [
+                "الرغبة المحرمة: ممارسة العلاقة العنيفة (Rough Sex)، شد الشعر بقوة، والضرب الخفيف على المؤخرة أثناء الإيلاج من الخلف (Doggy) مع الشتائم.",
+                "الرغبة المحرمة: أن تقوم [RECEIVER] بامتصاص عضو [SENDER] بالكامل ببطء شديد مع النظر مباشرة في عينيه بنظرة خضوع، حتى يصل للنشوة داخل فمها.",
+                "الرغبة المحرمة: تقييد [RECEIVER] بالكامل في السرير، واستخدام مكعبات الثلج ولسان [SENDER] على مناطقها الحساسة دون إيلاج حتى تبكي للحصول عليه.",
+                "الرغبة المحرمة: الجنس الفموي المتبادل (وضع 69) لفترة طويلة دون استعجال، حتى يتذوق كل طرف نشوة الآخر في نفس اللحظة.",
+                "الرغبة المحرمة: أن يعامل [SENDER] [RECEIVER] وكأنها بائعة هوى رخيصة اشتراها لليلة، ويتعامل مع جسدها بقسوة وشبق، وتستجيب هي بفجور.",
+                "الرغبة المحرمة: ممارسة العلاقة أمام مرآة كبيرة لرؤية تفاصيل الإيلاج، مع إجبار [RECEIVER] على النظر لنفسها ووصف ما تراه بألفاظ بذيئة.",
+                "الرغبة المحرمة: القذف المباشر على وجه أو صدر [RECEIVER] في نهاية العلاقة، مع ترك السائل عليها لفترة كعلامة للسيطرة.",
+                "الرغبة المحرمة: استخدام الأظافر والخدش الخفيف على الظهر أثناء النشوة لتارك علامات خفيفة مؤقتة.",
+                "الرغبة المحرمة: أن يرفض [SENDER] السماح لـ [RECEIVER] بالوصول للنشوة (Edging) ويوقف العلاقة قبل ثواني من وصولها 3 مرات.",
+                "الرغبة المحرمة: الإيلاج العميق والبطيء جداً، لا توجد أي حركة سريعة لمدة 15 دقيقة، التركيز فقط على الإحساس الداخلي والهمس المستمر."
+            ],
+            quirks: [
+                "<strong>السباك الوقح وصاحبة البيت اللعوب:</strong> [SENDER] سباك جاء لإصلاح عطل. متلازمته: النظرات الفاحشة والتحدث بوقاحة وألفاظ شعبية. متلازمة [RECEIVER]: الانحناء أمامه عمداً لإظهار مفاتنها وتجاهل وقاحته بل الاستمتاع بها وإغرائه حتى ينقض عليها.",
+                "<strong>المقتحم العنيف والضحية المستسلمة (لعبة الخوف):</strong> [SENDER] يقتحم الغرفة. متلازمته: استخدام القوة الجسدية (بأمان)، تثبيت يديها، والتهديد الجنسي. متلازمة [RECEIVER]: المقاومة الوهمية وصراخ مكتوم لدقيقة، ثم الاستسلام والذوبان في الإثارة.",
+                "<strong>الطبيب النفسي المريض والمريضة:</strong> [SENDER] طبيب يستغل الجلسة. متلازمته: طرح أسئلة جنسية محرجة وبذيئة، وإجبارها على لمس نفسها أمامه كعلاج. متلازمة [RECEIVER]: الخجل المصطنع الذي يتحول لشهوة وتوسل.",
+                "<strong>السيد والحيوان الأليف (Pet Play):</strong> متلازمة [SENDER]: الجلوس كملك وإعطاء أوامر (الزحف، اللعق، تقبيل القدمين). متلازمة [RECEIVER]: يمنع التحدث كالبشر، مسموح فقط بآهات الخضوع وتلبية الأوامر فوراً عارية.",
+                "<strong>المدير المتسلط والموظفة المتمردة:</strong> [SENDER] يعاقب [RECEIVER]. متلازمته: منعها من النظر في عينيه إلا بإذنه، خلع قطعة ملابس مع كل أمر. متلازمة [RECEIVER]: استفزازه بنظرات جريئة ولمس نفسها لإغرائه أثناء التوبيخ.",
+                "<strong>الراهب والخاطئة:</strong> متلازمة [SENDER]: يتصنع التقوى ويرفض الإغراء بكلمات مصطنعة ويدير وجهه. متلازمة [RECEIVER]: تحاول إفساده بكل الطرق (لمس، تعري، رقص) حتى ينهار ويتحول لوحش جنسي.",
+                "<strong>المصور والموديل الجريئة:</strong> [SENDER] مصور يعطي أوامر دقيقة للوضعيات. متلازمته: لا يلمسها بيده بل بعصا أو مسطرة لتعديل وضعها. متلازمة [RECEIVER]: تنفيذ وضعيات إباحية فاضحة بصمت تام مع نظرات مغرية."
+            ],
+            surrender: [
+                "أمر فوري: تجردوا من ملابسكم تماماً في خلال 10 ثواني. من يبطئ عليه أن يركع ويلعق جسد الآخر من قدميه حتى رقبته كعقاب.",
+                "أمر فوري: على [RECEIVER] الاستلقاء وفتح ساقيها بالكامل. وعلى [SENDER] أن يتأملها ويتغزل فيها بألفاظ بذيئة لمدة 3 دقائق دون أن يلمسها مهما ترجته.",
+                "أمر فوري: إيلاج عنيف وسريع جداً دون أي مقدمات إضافية، مع قيام [SENDER] بتوجيه الشتائم الجنسية وإجبار [RECEIVER] على الرد بكلمات أكثر فجوراً.",
+                "أمر فوري: تقوم [RECEIVER] بالجلوس فوق وجه [SENDER] وإجباره على إمتاعها بلسانه بالكامل حتى تصل للنشوة القوية، مع منعه من استخدام يديه.",
+                "أمر فوري: على [SENDER] حمل [RECEIVER] ورميها على السرير بعنف محبب، وتثبيتها بقوة، ثم أخذ ما يريده منها دون أي استئذان أو نقاش.",
+                "أمر فوري: استخدام أي سائل متاح للانزلاق بأجسادكم العارية في احتكاك كامل لمدة 5 دقائق لإشعال الحرارة قبل الإيلاج.",
+                "أمر فوري: يمنع الإيلاج التقليدي.. عليكم الوصول للنشوة باستخدام الأيدي والفم فقط في وضعية متبادلة (69) متزامنة.",
+                "أمر فوري: تغمية عيون [SENDER]، وعلى [RECEIVER] أن تقوده وتفعل به ما تشاء (عض، لعق، ركوب) وهو مستسلم تماماً لـ 10 دقائق."
+            ],
+            statue: [
+                "يتم ربط [SENDER] في الكرسي بالكامل. تقوم [RECEIVER] بعمل تعري بطيء جداً، ثم تجلس فوقه وتمارس العلاقة دون أن يملك حرية اللمس.",
+                "تستلقي [RECEIVER] كصنم. يقوم [SENDER] باستكشاف جسدها بلسانه وأصابعه في كل مكان دون أن يحق لها إصدار صوت أو حركة.",
+                "وضعية النجمة: تستلقي [RECEIVER] وذراعيها وساقيها متباعدة تماماً (كأنها مثبتة بالسرير) ولا تتحرك مهما فعل [SENDER] بها.",
+                "صنم الحائط: تقف [RECEIVER] ووجهها ويداها على الحائط، ممنوع الالتفات للخلف، بينما ينفذ [SENDER] إيلاجاً أو مداعبة من الخلف.",
+                "الصنم الناطق: [SENDER] مقيد تماماً ولا يتحرك، مسموح له فقط بإعطاء أوامر شفهية بذيئة لـ [RECEIVER] لتفعلها بنفسها أمامه."
+            ]
+        };
+
+        const GAMES_META = {
+            'dirty_talk': { type: 'hot', title: 'محرك الألفاظ الجريئة', desc: 'ألفاظ ساخنة وخادشة للحياء لكسر حاجز الكسوف.' },
+            'forbidden': { type: 'hot', title: 'صندوق الاعترافات المحرمة', desc: 'أفعال ورغبات عميقة يجبركما النظام على فعلها.' },
+            'quirks': { type: 'hot', title: 'سيناريوهات المتلازمات', desc: 'تقمص شخصيات جنسية غريبة بمتلازمات سلوكية عبثية.' },
+            'surrender': { type: 'hot', title: 'عقوبات السرير المشبوبة', desc: 'أوامر مباشرة عنيفة ومثيرة تنفذ فوراً دون نقاش.' },
+            'statue': { type: 'basic', title: 'قانون الصنم الحسي', desc: 'أحدكما تمثال مستسلم والآخر يمارس السيطرة الكاملة.' }
+        };
+
+        // --- STREAMING_CHUNK: Core Logic & Firebase Sync ---
+        function getCoupleId(email1, email2) {
+            // Sort emails to ensure both partners generate the same ID
+            const sorted = [email1.toLowerCase().trim(), email2.toLowerCase().trim()].sort();
+            return btoa(sorted.join('|')).replace(/=/g, '');
+        }
+
+        async function initAuth() {
+            try {
+                if (initialToken) await auth.signInWithCustomToken(initialToken);
+                else await signInAnonymously(auth);
+                
+                if (state.myEmail && state.partnerEmail) {
+                    await connectCouple(state.myEmail, state.partnerEmail, state.myName);
+                } else {
+                    renderLogin();
+                }
+            } catch (error) {
+                console.error("Auth error:", error);
+                alert("حدث خطأ في الاتصال. حاول مرة أخرى.");
+            }
+        }
+
+        async function connectCouple(myEmail, partnerEmail, myName) {
+            state.view = 'loading'; renderApp();
+            
+            state.myEmail = myEmail.toLowerCase().trim();
+            state.partnerEmail = partnerEmail.toLowerCase().trim();
+            state.myName = myName.trim();
+            state.coupleId = getCoupleId(state.myEmail, state.partnerEmail);
+            
+            // Save locally
+            localStorage.setItem('sico_myEmail', state.myEmail);
+            localStorage.setItem('sico_partnerEmail', state.partnerEmail);
+            localStorage.setItem('sico_myName', state.myName);
+
+            state.docRef = doc(db, 'artifacts', sandboxAppId, 'public', 'data', 'couples', state.coupleId);
+            
+            // Register user in the couple doc
+            try {
+                await setDoc(state.docRef, {
+                    users: {
+                        [state.myEmail]: { name: state.myName, autoConsent: false, online: true }
+                    },
+                    gameState: { active: false, gameId: null, consented: [], history: {} },
+                    invite: { status: 'none' }
+                }, { merge: true });
+
+                // Start Listening
+                listenToCoupleDoc();
+            } catch (err) {
+                console.error("Firestore error:", err);
+            }
+        }
+
+        function listenToCoupleDoc() {
+            if (state.unsubscribe) state.unsubscribe();
+            
+            state.unsubscribe = onSnapshot(state.docRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    state.serverData = snapshot.data();
+                    handleServerUpdates();
+                }
+            }, (error) => {
+                console.error("Snapshot error:", error);
+            });
+        }
+
+        function handleServerUpdates() {
+            const data = state.serverData;
+            
+            // Routing based on game state
+            if (data.gameState?.active) {
+                if (state.view !== 'game') { state.view = 'game'; renderApp(); }
+                else { updateGameUI(); }
+            } else {
+                if (state.view !== 'dashboard') { state.view = 'dashboard'; renderApp(); }
+            }
+
+            // Handle Invites (Popup)
+            if (data.invite?.status === 'pending' && data.invite.sender !== state.myEmail) {
+                showInviteModal(data.invite.gameId, data.invite.senderName);
+            } else {
+                hideModal();
+            }
+            
+            // Handle Invite Rejection notification
+            if (data.invite?.status === 'rejected' && data.invite.sender === state.myEmail) {
+                showToast("رفض الطرف الآخر دعوتك الحالية.", "error");
+                // Reset invite state after seeing it
+                updateDoc(state.docRef, { 'invite.status': 'none' });
+            }
+        }
+
+        // --- STREAMING_CHUNK: Interactions ---
+        async function sendInvite(gameId) {
+            showToast("جاري إرسال الدعوة لشريكك...", "success");
+            await updateDoc(state.docRef, {
+                invite: { 
+                    gameId: gameId, 
+                    sender: state.myEmail, 
+                    senderName: state.myName,
+                    status: 'pending' 
+                }
+            });
+        }
+
+        async function acceptInvite() {
+            const gameId = state.serverData.invite.gameId;
+            await updateDoc(state.docRef, {
+                'invite.status': 'accepted',
+                'gameState.active': true,
+                'gameState.gameId': gameId,
+                'gameState.consented': [], // Reset consents for new game
+                'gameState.currentItem': null
+            });
+            drawNextItem(gameId); // Auto draw first item
+        }
+
+        async function rejectInvite() {
+            await updateDoc(state.docRef, { 'invite.status': 'rejected' });
+            hideModal();
+        }
+
+        async function toggleAutoConsent(e) {
+            const isChecked = e.target.checked;
+            await updateDoc(state.docRef, {
+                [`users.${state.myEmail}.autoConsent`]: isChecked
+            });
+        }
+
+        async function giveManualConsent() {
+            const currentConsents = state.serverData.gameState.consented || [];
+            if (!currentConsents.includes(state.myEmail)) {
+                await updateDoc(state.docRef, {
+                    'gameState.consented': [...currentConsents, state.myEmail]
+                });
+            }
+        }
+
+        async function endGame() {
+            await updateDoc(state.docRef, {
+                'gameState.active': false,
+                'gameState.gameId': null,
+                'invite.status': 'none'
+            });
+        }
+
+        // Smart Shuffle Bag Logic
+        async function drawNextItem(gameId) {
+            const pool = RAW_DATA[gameId];
+            const historyObj = state.serverData.gameState.history || {};
+            let historyArr = historyObj[gameId] || [];
+
+            if (historyArr.length >= pool.length) {
+                historyArr = []; // Reset if all used
+                showToast("تم إعادة خلط الأوامر من جديد!", "success");
+            }
+
+            let availableIndices = [];
+            for (let i = 0; i < pool.length; i++) {
+                if (!historyArr.includes(i)) availableIndices.push(i);
+            }
+
+            const randomIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)];
+            let rawText = pool[randomIndex];
+
+            // Replace tags with actual names. Assuming sender initiated the current content context, 
+            // but realistically it's better to randomly assign or strictly assign based on roles.
+            // Let's use Husband/Wife logic if we had it, but we have Email 1 / Email 2.
+            // We will format it when displaying.
+            
+            historyArr.push(randomIndex);
+            
+            await updateDoc(state.docRef, {
+                'gameState.currentItem': randomIndex,
+                [`gameState.history.${gameId}`]: historyArr
+            });
+        }
+
+        function formatItemText(rawText) {
+            // Find partner's name
+            let partnerName = 'الشريك';
+            const users = state.serverData.users;
+            for (let email in users) {
+                if (email !== state.myEmail) partnerName = users[email].name;
+            }
+
+            // Randomly assign SENDER and RECEIVER for dynamic roles
+            // We use the raw text length as a deterministic seed so both screens show same roles
+            const seed = rawText.length;
+            let p1 = state.myName;
+            let p2 = partnerName;
+            if (seed % 2 === 0) { p1 = partnerName; p2 = state.myName; }
+
+            return rawText
+                .replace(/\[SENDER\]/g, `<span class="text-yellow-400 font-bold">${p1}</span>`)
+                .replace(/\[RECEIVER\]/g, `<span class="text-yellow-400 font-bold">${p2}</span>`);
+        }
+
+        // --- STREAMING_CHUNK: UI Rendering ---
+        const domApp = document.getElementById('app');
+
+        function renderApp() {
+            if (state.view === 'loading') return;
+            
+            let html = '';
+            if (state.view === 'login') html = getLoginHTML();
+            else if (state.view === 'dashboard') html = getDashboardHTML();
+            else if (state.view === 'game') html = getGameHTML();
+            
+            domApp.innerHTML = html;
+            
+            if (state.view === 'login') {
+                document.getElementById('login-form').addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const me = document.getElementById('inp-me').value;
+                    const par = document.getElementById('inp-par').value;
+                    const nm = document.getElementById('inp-name').value;
+                    connectCouple(me, par, nm);
+                });
+            }
+            if (state.view === 'dashboard') {
+                const tog = document.getElementById('auto-consent-toggle');
+                if(tog) {
+                    tog.checked = state.serverData.users[state.myEmail]?.autoConsent || false;
+                    tog.addEventListener('change', toggleAutoConsent);
+                }
+            }
+        }
+
+        function updateGameUI() {
+            if (state.view === 'game') {
+                const gameContainer = document.getElementById('game-logic-area');
+                if(gameContainer) gameContainer.innerHTML = getGameLogicHTML();
+            }
+        }
+
+        function getLoginHTML() {
+            return `
+                <div class="glass-panel p-8 rounded-2xl fade-in mt-10">
+                    <div class="text-center mb-8">
+                        <h1 class="text-4xl text-yellow-500 mb-2 pulse-glow title-font">بوابة الجرأة</h1>
+                        <p class="text-gray-300 text-sm">اربط هاتفك بهاتف شريكك لتبدأ المتعة عن بُعد</p>
+                    </div>
+                    <form id="login-form">
+                        <input type="text" id="inp-name" required placeholder="اسمك (أو لقبك المفضل)" class="input-field">
+                        <input type="email" id="inp-me" required placeholder="بريدك الإلكتروني" class="input-field">
+                        <input type="email" id="inp-par" required placeholder="البريد الإلكتروني للشريك" class="input-field">
+                        <button type="submit" class="btn-main mt-4 text-xl">دخول الغرفة السرية</button>
+                    </form>
+                    <p class="text-xs text-gray-500 text-center mt-6">يستخدم البريد فقط لربط الجهازين بأمان ولا يتم تخزين بيانات شخصية.</p>
+                </div>
+            `;
+        }
+
+        function getDashboardHTML() {
+            const data = state.serverData;
+            let partnerName = 'في انتظار الشريك...';
+            let partnerOnline = false;
+            
+            // Check partner status
+            for (let email in data.users) {
+                if (email !== state.myEmail) {
+                    partnerName = data.users[email].name;
+                    partnerOnline = true;
+                }
+            }
+
+            let hotGames = ''; let basicGames = '';
+            for (let key in GAMES_META) {
+                const g = GAMES_META[key];
+                const btnClass = g.type === 'hot' ? 'border-pink-800 border-t-4' : 'border-red-800 border-t-4';
+                const titleColor = g.type === 'hot' ? 'text-pink-400' : 'text-yellow-500';
+                
+                const card = `
+                    <div class="glass-panel p-5 rounded-xl cursor-pointer hover:-translate-y-1 transition-transform ${btnClass}" onclick="window.sendInvite('${key}')">
+                        <h3 class="text-xl title-font mb-2 ${titleColor}">${g.title}</h3>
+                        <p class="text-sm text-gray-400 leading-relaxed">${g.desc}</p>
+                        <div class="mt-4 text-left">
+                            <span class="text-xs bg-red-900 bg-opacity-50 text-red-200 px-3 py-1 rounded-full border border-red-800"><i class="fa-solid fa-paper-plane ml-1"></i> إرسال دعوة</span>
+                        </div>
+                    </div>`;
+                if (g.type === 'hot') hotGames += card; else basicGames += card;
+            }
+
+            // Check if I sent an invite that is pending
+            const pendingInviteAlert = (data.invite?.status === 'pending' && data.invite?.sender === state.myEmail) 
+                ? `<div class="bg-yellow-900 bg-opacity-40 border border-yellow-600 text-yellow-200 p-3 rounded-lg mb-6 text-center text-sm animate-pulse">
+                     <i class="fa-solid fa-hourglass-half ml-2"></i> تم إرسال الدعوة لـ ${partnerName}.. في انتظار القبول
+                   </div>` : '';
+
+            return `
+                <div class="w-full fade-in pb-10 mt-6">
+                    <div class="flex justify-between items-center mb-6 glass-panel p-4 rounded-xl">
+                        <div>
+                            <p class="text-sm text-gray-400">مرحباً، <span class="text-yellow-400 font-bold">${state.myName}</span></p>
+                            <p class="text-xs mt-1">الشريك: <span class="${partnerOnline ? 'text-green-400' : 'text-gray-500'}">${partnerName} ${partnerOnline ? '🟢' : '⚪'}</span></p>
+                        </div>
+                        <button onclick="localStorage.clear(); location.reload();" class="text-gray-500 hover:text-white text-sm"><i class="fa-solid fa-sign-out-alt"></i> خروج</button>
+                    </div>
+
+                    ${pendingInviteAlert}
+
+                    <!-- Settings Toggle -->
+                    <div class="glass-panel p-4 rounded-xl mb-8 flex justify-between items-center border-l-4 border-l-green-500">
+                        <div>
+                            <h3 class="font-bold text-white text-sm">الموافقة الدائمة (Auto-Consent)</h3>
+                            <p class="text-xs text-gray-400 mt-1">تخطي رسالة التحذير في الألعاب الجريئة</p>
+                        </div>
+                        <div class="relative inline-block w-12 align-middle select-none transition duration-200 ease-in">
+                            <input type="checkbox" name="toggle" id="auto-consent-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 transition-all"/>
+                            <label for="toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-600 cursor-pointer transition-colors"></label>
+                        </div>
+                    </div>
+
+                    <h2 class="text-2xl text-pink-500 border-b-2 border-pink-800 pb-2 mb-4 title-font inline-block">🔥 قسم الجرأة والمحظورات</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">${hotGames}</div>
+
+                    <h2 class="text-2xl text-yellow-500 border-b-2 border-red-800 pb-2 mb-4 title-font inline-block">الألعاب الحميمية</h2>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">${basicGames}</div>
+                </div>
+            `;
+        }
+
+        function getGameHTML() {
+            const gameId = state.serverData.gameState.gameId;
+            const gameMeta = GAMES_META[gameId];
+            return `
+                <div class="glass-panel p-6 rounded-2xl fade-in mt-6 border-2 ${gameMeta.type==='hot' ? 'border-pink-800' : 'border-yellow-600'}">
+                    <h2 class="text-3xl text-center mb-6 title-font ${gameMeta.type==='hot' ? 'text-pink-400' : 'text-yellow-500'}">${gameMeta.title}</h2>
+                    <div id="game-logic-area">${getGameLogicHTML()}</div>
+                    <button onclick="window.endGame()" class="mt-8 bg-transparent border border-gray-600 text-gray-400 hover:text-white px-4 py-2 rounded-lg w-full text-sm transition-colors">إنهاء اللعبة والعودة</button>
+                </div>
+            `;
+        }
+
+        function getGameLogicHTML() {
+            const data = state.serverData;
+            const gameId = data.gameState.gameId;
+            const gameMeta = GAMES_META[gameId];
+            
+            // 1. Evaluate Consent Requirement
+            let needsConsent = false;
+            if (gameMeta.type === 'hot') {
+                const myAuto = data.users[state.myEmail]?.autoConsent;
+                let partnerEmail = Object.keys(data.users).find(e => e !== state.myEmail);
+                const partnerAuto = partnerEmail ? data.users[partnerEmail].autoConsent : false;
+                
+                if (!myAuto || !partnerAuto) needsConsent = true;
+            }
+
+            const consentsGiven = data.gameState.consented || [];
+            const isConsentedFully = consentsGiven.length >= 2;
+
+            // 2. Render Consent UI if needed
+            if (needsConsent && !isConsentedFully) {
+                const iConsented = consentsGiven.includes(state.myEmail);
+                const partnerConsented = consentsGiven.length === 1 && !iConsented;
+                
+                return `
+                    <div class="bg-black bg-opacity-60 border border-pink-700 p-5 rounded-lg text-center mb-6">
+                        <i class="fa-solid fa-triangle-exclamation text-3xl text-pink-500 mb-3"></i>
+                        <p class="text-gray-300 mb-4 text-sm leading-relaxed">هذه اللعبة تحتوي على أوامر وألفاظ خادشة للحياء لكسر الروتين. تتطلب موافقة الطرفين صراحة للبدء.</p>
+                        
+                        ${partnerConsented ? '<p class="text-green-400 text-sm mb-4">الشريك وافق.. في انتظارك!</p>' : ''}
+                        
+                        ${iConsented 
+                            ? `<button disabled class="bg-green-800 text-white px-6 py-3 rounded-lg w-full opacity-50 cursor-not-allowed">تمت الموافقة.. في انتظار الشريك</button>`
+                            : `<button onclick="window.giveManualConsent()" class="btn-hot text-lg">أوافق على اللعب</button>`
+                        }
+                    </div>
+                `;
+            }
+
+            // 3. Render Game Content
+            const currentIndex = data.gameState.currentItem;
+            let contentHTML = '<div class="text-center p-8"><div class="loader"></div><p class="mt-4 text-gray-400">جاري السحب...</p></div>';
+            
+            if (currentIndex !== null && currentIndex !== undefined) {
+                const rawText = RAW_DATA[gameId][currentIndex];
+                const formattedText = formatItemText(rawText);
+                contentHTML = `
+                    <div class="bg-red-900 bg-opacity-20 border border-red-800 p-6 rounded-xl text-center min-h-[150px] flex items-center justify-center relative overflow-hidden">
+                        <div class="absolute -top-4 -right-4 text-6xl text-red-900 opacity-20"><i class="fa-solid fa-fire"></i></div>
+                        <p class="text-xl md:text-2xl leading-loose font-bold title-font relative z-10 text-gray-100">${formattedText}</p>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="fade-in">
+                    ${contentHTML}
+                    <button onclick="window.drawNextItem('${gameId}')" class="btn-main mt-6 text-xl shadow-lg shadow-red-900/50">
+                        <i class="fa-solid fa-dice ml-2"></i> سحب أمر جديد
+                    </button>
+                    <p class="text-xs text-gray-500 text-center mt-4">النظام يضمن عدم تكرار الأوامر في هذه الجلسة</p>
+                </div>
+            `;
+        }
+
+        // --- STREAMING_CHUNK: Helpers & UI Notifications ---
+        function showInviteModal(gameId, senderName) {
+            const modal = document.getElementById('modal-container');
+            const content = document.getElementById('modal-content');
+            const gameTitle = GAMES_META[gameId]?.title || 'لعبة جديدة';
+            
+            content.innerHTML = `
+                <div class="text-5xl text-yellow-500 mb-4 animate-bounce"><i class="fa-solid fa-envelope-open-text"></i></div>
+                <h3 class="text-2xl font-bold mb-2 title-font text-white">دعوة ساخنة!</h3>
+                <p class="text-gray-300 mb-6">يريد <strong>${senderName}</strong> أن يلعب معك 
+                    <br><span class="text-pink-400 font-bold text-xl">${gameTitle}</span>
+                </p>
+                <div class="flex gap-3">
+                    <button onclick="window.acceptInvite()" class="flex-1 bg-green-600 hover:bg-green-500 text-white py-3 rounded-lg font-bold transition-colors">قبول الدخول</button>
+                    <button onclick="window.rejectInvite()" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-lg font-bold transition-colors">رفض</button>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                content.classList.remove('scale-95', 'opacity-0');
+                content.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function hideModal() {
+            const modal = document.getElementById('modal-container');
+            const content = document.getElementById('modal-content');
+            content.classList.remove('scale-100', 'opacity-100');
+            content.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+        }
+
+        function showToast(msg, type='info') {
+            const toast = document.createElement('div');
+            toast.className = `fixed top-5 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full text-sm font-bold z-50 fade-in ${type==='error'?'bg-red-600 text-white':'bg-green-600 text-white'}`;
+            toast.innerText = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.style.opacity='0'; setTimeout(()=>toast.remove(),500); }, 3000);
+        }
+
+        // Export functions to window for inline HTML onclick handlers
+        window.sendInvite = sendInvite;
+        window.acceptInvite = acceptInvite;
+        window.rejectInvite = rejectInvite;
+        window.giveManualConsent = giveManualConsent;
+        window.drawNextItem = drawNextItem;
+        window.endGame = endGame;
+
+        // Initialize
+        window.onload = () => {
+            initAuth();
+        };
+    </script>
+</body>
+</html>
