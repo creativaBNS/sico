@@ -246,29 +246,21 @@
             // Register user in the couple doc
             try {
                 const docSnap = await getDoc(state.docRef);
-                let existingAuto = localStorage.getItem('sico_autoConsent') === 'true';
 
                 if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    // جلب حالة الموافقة الدائمة السابقة من السيرفر إن وجدت لعدم مسحها
-                    if (data.users && data.users[state.myEmail] && data.users[state.myEmail].autoConsent !== undefined) {
-                        existingAuto = data.users[state.myEmail].autoConsent;
-                    }
-                    localStorage.setItem('sico_autoConsent', existingAuto);
-                    
-                    // تحديث بيانات المستخدم فقط دون مسح حالة اللعبة
+                    // تحديث بيانات المستخدم وتفعيل الموافقة الدائمة إجبارياً
                     await updateDoc(state.docRef, {
                         [`users.${state.myEmail}.name`]: state.myName,
                         [`users.${state.myEmail}.online`]: true,
-                        [`users.${state.myEmail}.autoConsent`]: existingAuto
+                        [`users.${state.myEmail}.autoConsent`]: true
                     });
                 } else {
                     // إنشاء الغرفة لأول مرة
                     await setDoc(state.docRef, {
                         users: {
-                            [state.myEmail]: { name: state.myName, autoConsent: existingAuto, online: true }
+                            [state.myEmail]: { name: state.myName, autoConsent: true, online: true }
                         },
-                        gameState: { active: false, gameId: null, consented: [], history: {} },
+                        gameState: { active: false, gameId: null, history: {} },
                         invite: { status: 'none' }
                     });
                 }
@@ -338,7 +330,6 @@
                 'invite.status': 'accepted',
                 'gameState.active': true,
                 'gameState.gameId': gameId,
-                'gameState.consented': [], // Reset consents for new game
                 'gameState.currentItem': null
             });
             drawNextItem(gameId); // Auto draw first item
@@ -347,23 +338,6 @@
         async function rejectInvite() {
             await updateDoc(state.docRef, { 'invite.status': 'rejected' });
             hideModal();
-        }
-
-        async function toggleAutoConsent(e) {
-            const isChecked = e.target.checked;
-            localStorage.setItem('sico_autoConsent', isChecked); // الاحتفاظ بها محلياً
-            await updateDoc(state.docRef, {
-                [`users.${state.myEmail}.autoConsent`]: isChecked
-            });
-        }
-
-        async function giveManualConsent() {
-            const currentConsents = state.serverData.gameState.consented || [];
-            if (!currentConsents.includes(state.myEmail)) {
-                await updateDoc(state.docRef, {
-                    'gameState.consented': [...currentConsents, state.myEmail]
-                });
-            }
         }
 
         async function endGame() {
@@ -410,13 +384,14 @@
             const data = state.serverData;
             
             // الترتيب الأبجدي للإيميلات لضمان نفس التوزيع الثابت على الهاتفين
-            const sortedEmails = Object.keys(data.users).sort();
+            const sortedEmails = [state.myEmail, state.partnerEmail].sort();
+            
             const email1 = sortedEmails[0];
-            const email2 = sortedEmails.length > 1 ? sortedEmails[1] : null;
+            const email2 = sortedEmails[1];
 
-            // استخراج الأسماء
-            const name1 = data.users[email1]?.name || 'الطرف الأول';
-            const name2 = email2 ? data.users[email2]?.name : 'الشريك';
+            // استخراج الأسماء مع الاعتماد على الاسم المحلي لتجنب أي بطء أو أخطاء
+            const name1 = (email1 === state.myEmail) ? state.myName : (data.users[email1]?.name || 'شريكك');
+            const name2 = (email2 === state.myEmail) ? state.myName : (data.users[email2]?.name || 'شريكك');
 
             // الاعتماد على رقم المهمة وطول النص لضمان توزيع نفس الأدوار في نفس اللحظة لكلا الطرفين
             const currentIndex = data.gameState.currentItem || 0;
@@ -453,13 +428,6 @@
                     connectCouple(me, par, nm);
                 });
             }
-            if (state.view === 'dashboard') {
-                const tog = document.getElementById('auto-consent-toggle');
-                if(tog) {
-                    tog.checked = state.serverData.users[state.myEmail]?.autoConsent || false;
-                    tog.addEventListener('change', toggleAutoConsent);
-                }
-            }
         }
 
         function updateGameUI() {
@@ -482,7 +450,8 @@
                         <input type="email" id="inp-par" required placeholder="البريد الإلكتروني للشريك" class="input-field">
                         <button type="submit" class="btn-main mt-4 text-xl">دخول الغرفة السرية</button>
                     </form>
-                    <p class="text-xs text-gray-500 text-center mt-6">يستخدم البريد فقط لربط الجهازين بأمان ولا يتم تخزين بيانات شخصية.</p>
+                    <p class="text-xs text-pink-400 text-center mt-6 font-bold">⚠️ تنويه: دخولكما للغرفة يعني موافقتكما التامة على كسر حواجز الحياء ومحتوى الألعاب الجريئة.</p>
+                    <p class="text-xs text-gray-500 text-center mt-2">يستخدم البريد فقط لربط الجهازين بأمان ولا يتم تخزين بيانات شخصية.</p>
                 </div>
             `;
         }
@@ -535,19 +504,7 @@
 
                     ${pendingInviteAlert}
 
-                    <!-- Settings Toggle -->
-                    <div class="glass-panel p-4 rounded-xl mb-8 flex justify-between items-center border-l-4 border-l-green-500">
-                        <div>
-                            <h3 class="font-bold text-white text-sm">الموافقة الدائمة (Auto-Consent)</h3>
-                            <p class="text-xs text-gray-400 mt-1">تخطي رسالة التحذير في الألعاب الجريئة</p>
-                        </div>
-                        <div class="relative inline-block w-12 align-middle select-none transition duration-200 ease-in">
-                            <input type="checkbox" name="toggle" id="auto-consent-toggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer z-10 transition-all"/>
-                            <label for="toggle" class="toggle-label block overflow-hidden h-6 rounded-full bg-gray-600 cursor-pointer transition-colors"></label>
-                        </div>
-                    </div>
-
-                    <h2 class="text-2xl text-pink-500 border-b-2 border-pink-800 pb-2 mb-4 title-font inline-block">🔥 قسم الجرأة والمحظورات</h2>
+                    <h2 class="text-2xl text-pink-500 border-b-2 border-pink-800 pb-2 mb-4 title-font inline-block mt-4">🔥 قسم الجرأة والمحظورات</h2>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">${hotGames}</div>
 
                     <h2 class="text-2xl text-yellow-500 border-b-2 border-red-800 pb-2 mb-4 title-font inline-block">الألعاب الحميمية</h2>
@@ -571,42 +528,8 @@
         function getGameLogicHTML() {
             const data = state.serverData;
             const gameId = data.gameState.gameId;
-            const gameMeta = GAMES_META[gameId];
             
-            // 1. Evaluate Consent Requirement
-            let needsConsent = false;
-            if (gameMeta.type === 'hot') {
-                const myAuto = data.users[state.myEmail]?.autoConsent;
-                let partnerEmail = Object.keys(data.users).find(e => e !== state.myEmail);
-                const partnerAuto = partnerEmail ? data.users[partnerEmail].autoConsent : false;
-                
-                if (!myAuto || !partnerAuto) needsConsent = true;
-            }
-
-            const consentsGiven = data.gameState.consented || [];
-            const isConsentedFully = consentsGiven.length >= 2;
-
-            // 2. Render Consent UI if needed
-            if (needsConsent && !isConsentedFully) {
-                const iConsented = consentsGiven.includes(state.myEmail);
-                const partnerConsented = consentsGiven.length === 1 && !iConsented;
-                
-                return `
-                    <div class="bg-black bg-opacity-60 border border-pink-700 p-5 rounded-lg text-center mb-6">
-                        <i class="fa-solid fa-triangle-exclamation text-3xl text-pink-500 mb-3"></i>
-                        <p class="text-gray-300 mb-4 text-sm leading-relaxed">هذه اللعبة تحتوي على أوامر وألفاظ خادشة للحياء لكسر الروتين. تتطلب موافقة الطرفين صراحة للبدء.</p>
-                        
-                        ${partnerConsented ? '<p class="text-green-400 text-sm mb-4">الشريك وافق.. في انتظارك!</p>' : ''}
-                        
-                        ${iConsented 
-                            ? `<button disabled class="bg-green-800 text-white px-6 py-3 rounded-lg w-full opacity-50 cursor-not-allowed">تمت الموافقة.. في انتظار الشريك</button>`
-                            : `<button onclick="window.giveManualConsent()" class="btn-hot text-lg">أوافق على اللعب</button>`
-                        }
-                    </div>
-                `;
-            }
-
-            // 3. Render Game Content
+            // 1. Render Game Content Directly (Consent is implicit upon login)
             const currentIndex = data.gameState.currentItem;
             let contentHTML = '<div class="text-center p-8"><div class="loader"></div><p class="mt-4 text-gray-400">جاري السحب...</p></div>';
             
@@ -677,7 +600,6 @@
         window.sendInvite = sendInvite;
         window.acceptInvite = acceptInvite;
         window.rejectInvite = rejectInvite;
-        window.giveManualConsent = giveManualConsent;
         window.drawNextItem = drawNextItem;
         window.endGame = endGame;
 
