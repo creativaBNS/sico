@@ -245,13 +245,33 @@
             
             // Register user in the couple doc
             try {
-                await setDoc(state.docRef, {
-                    users: {
-                        [state.myEmail]: { name: state.myName, autoConsent: false, online: true }
-                    },
-                    gameState: { active: false, gameId: null, consented: [], history: {} },
-                    invite: { status: 'none' }
-                }, { merge: true });
+                const docSnap = await getDoc(state.docRef);
+                let existingAuto = localStorage.getItem('sico_autoConsent') === 'true';
+
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    // جلب حالة الموافقة الدائمة السابقة من السيرفر إن وجدت لعدم مسحها
+                    if (data.users && data.users[state.myEmail] && data.users[state.myEmail].autoConsent !== undefined) {
+                        existingAuto = data.users[state.myEmail].autoConsent;
+                    }
+                    localStorage.setItem('sico_autoConsent', existingAuto);
+                    
+                    // تحديث بيانات المستخدم فقط دون مسح حالة اللعبة
+                    await updateDoc(state.docRef, {
+                        [`users.${state.myEmail}.name`]: state.myName,
+                        [`users.${state.myEmail}.online`]: true,
+                        [`users.${state.myEmail}.autoConsent`]: existingAuto
+                    });
+                } else {
+                    // إنشاء الغرفة لأول مرة
+                    await setDoc(state.docRef, {
+                        users: {
+                            [state.myEmail]: { name: state.myName, autoConsent: existingAuto, online: true }
+                        },
+                        gameState: { active: false, gameId: null, consented: [], history: {} },
+                        invite: { status: 'none' }
+                    });
+                }
 
                 // Start Listening
                 listenToCoupleDoc();
@@ -331,6 +351,7 @@
 
         async function toggleAutoConsent(e) {
             const isChecked = e.target.checked;
+            localStorage.setItem('sico_autoConsent', isChecked); // الاحتفاظ بها محلياً
             await updateDoc(state.docRef, {
                 [`users.${state.myEmail}.autoConsent`]: isChecked
             });
@@ -386,23 +407,28 @@
         }
 
         function formatItemText(rawText) {
-            // Find partner's name
-            let partnerName = 'الشريك';
-            const users = state.serverData.users;
-            for (let email in users) {
-                if (email !== state.myEmail) partnerName = users[email].name;
-            }
+            const data = state.serverData;
+            
+            // الترتيب الأبجدي للإيميلات لضمان نفس التوزيع الثابت على الهاتفين
+            const sortedEmails = Object.keys(data.users).sort();
+            const email1 = sortedEmails[0];
+            const email2 = sortedEmails.length > 1 ? sortedEmails[1] : null;
 
-            // Randomly assign SENDER and RECEIVER for dynamic roles
-            // We use the raw text length as a deterministic seed so both screens show same roles
-            const seed = rawText.length;
-            let p1 = state.myName;
-            let p2 = partnerName;
-            if (seed % 2 === 0) { p1 = partnerName; p2 = state.myName; }
+            // استخراج الأسماء
+            const name1 = data.users[email1]?.name || 'الطرف الأول';
+            const name2 = email2 ? data.users[email2]?.name : 'الشريك';
+
+            // الاعتماد على رقم المهمة وطول النص لضمان توزيع نفس الأدوار في نفس اللحظة لكلا الطرفين
+            const currentIndex = data.gameState.currentItem || 0;
+            const seed = currentIndex + rawText.length; 
+
+            // توزيع الأدوار بشكل موحد
+            const senderName = (seed % 2 === 0) ? name1 : name2;
+            const receiverName = (seed % 2 === 0) ? name2 : name1;
 
             return rawText
-                .replace(/\[SENDER\]/g, `<span class="text-yellow-400 font-bold">${p1}</span>`)
-                .replace(/\[RECEIVER\]/g, `<span class="text-yellow-400 font-bold">${p2}</span>`);
+                .replace(/\[SENDER\]/g, `<span class="text-yellow-400 font-bold">${senderName}</span>`)
+                .replace(/\[RECEIVER\]/g, `<span class="text-yellow-400 font-bold">${receiverName}</span>`);
         }
 
         // --- STREAMING_CHUNK: UI Rendering ---
